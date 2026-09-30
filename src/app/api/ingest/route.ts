@@ -3,10 +3,6 @@ import {
   convertSourceToMarkdown,
   getVertexConfig,
 } from "@/lib/gemini-ingest";
-import {
-  listExistingNoteTitles,
-  writeQuartzNote,
-} from "@/lib/quartz-content";
 
 export const runtime = "nodejs";
 
@@ -44,31 +40,31 @@ export async function POST(request: Request) {
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  const existingTitles = await listExistingNoteTitles();
 
   try {
     const converted = await convertSourceToMarkdown({
       filename: file.name,
       mimeType: file.type || "application/octet-stream",
       bytes,
-      existingTitles,
     });
 
-    const written = await writeQuartzNote(converted.title, converted.markdown);
-    const localFallback = converted.markdown.includes("ingestMode: local-fallback");
-
     return NextResponse.json({
-      slug: written.slug,
+      action: converted.action,
       title: converted.title,
-      filename: written.filename,
+      slug: converted.slug,
+      filename: converted.filename,
       markdown: converted.markdown,
       links: converted.links,
       detected: converted.detected,
+      knowledgeType: converted.knowledgeType,
+      resume: converted.resume,
+      alertes: converted.alertes,
+      liensARecalculer: converted.liensARecalculer,
+      written: converted.written,
+      cardId: converted.cardId,
       quartzUrl: "http://localhost:8080",
-      mode: localFallback ? "local-fallback" : "vertex",
-      warning: localFallback
-        ? "Vertex org policy blocked Gemini models. Used local auto-detection fallback for type/language/context."
-        : undefined,
+      mode: converted.mode,
+      warning: converted.warning,
     });
   } catch (error) {
     const message =

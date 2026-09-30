@@ -1,32 +1,49 @@
 ---
+id: c197af99-26ea-4688-adcf-52383b75a8cb
+version: 1
 title: Teams Bonus Calculation Draft
-tags:
-  - Payroll
-  - BE
-  - Bonus
-  - teams
+titre: Teams Bonus Calculation Draft
+source: demo://teams/Teams%20Bonus%20Calculation%20Draft
+sourceFingerprint: 72ca2ac6ec282527
+knowledgeType: discussion
 sourceType: teams
+language: en
 country: BE
+domaine: Payroll
 domain: Payroll
+sous-domaine: Bonus
+topic: Bonus
+statut: active
+tags: ["Payroll", "BE", "Bonus", "en", "teams"]
 ---
 
 # Teams Bonus Calculation Draft
 
-Informal Teams thread discussing an older bonus calculation approach for Belgium payroll.
+## Résumé
 
-## Summary
+Informal Teams thread still citing a 3-month eligibility rule and including overtime in the bonus base.
 
-Some colleagues still reference a 3-month eligibility rule and propose including overtime in the bonus base. This conflicts with the official 2026 procedure.
+## Intention de recherche
 
-## Warning
+Trouver la règle applicable pour BE / Payroll / Bonus.
 
-Potential conflict with [[Belgium Bonus Procedure 2026]].
+## Corps de connaissance
 
-## Provenance
+Channel Payroll-BE: "We still use 3 months for eligibility and include overtime in the base." This conflicts with the official 2026 procedure.
 
-Source label: Teams — Payroll BE channel  
-Excerpt: "We still use 3 months for eligibility and include overtime in the base."
+## Preuves source
 
-## Related
+- Source label: Teams Bonus Calculation Draft (teams)
+- Country: BE
+- Domain: Payroll
+- Topic: Bonus
+- Excerpt: "Channel Payroll-BE: 'We still use 3 months for eligibility and include overtime in the base.' This conflicts with the official 2026 procedure...."
+
+## Liens candidats
 
 - [[Belgium Bonus Procedure 2026]]
+- [[Belgium Payroll Calendar 2026]]
+
+## Alertes
+
+- Potential conflict with official procedure — verify before applying.

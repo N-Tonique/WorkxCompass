@@ -58,3 +58,7 @@ body {
 .ingest-shell aside {
   animation-delay: 0.12s;
 }
+
+.md-doc h1:first-child {
+  display: none;
+}

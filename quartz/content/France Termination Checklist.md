@@ -1,34 +1,50 @@
 ---
+id: 802cb110-d0f7-4956-9bee-365ac2f3e188
+version: 1
 title: France Termination Checklist
-tags:
-  - Payroll
-  - FR
-  - Termination
-  - procedure
+titre: France Termination Checklist
+source: demo://procedure/France%20Termination%20Checklist
+sourceFingerprint: c644d661cc46714f
+knowledgeType: procedure
 sourceType: procedure
+language: fr
 country: FR
+domaine: Payroll
 domain: Payroll
+sous-domaine: Termination
+topic: Termination
+statut: active
+tags: ["Payroll", "FR", "Termination", "fr", "procedure"]
 ---
 
 # France Termination Checklist
 
-Checklist for final payroll settlement when terminating an employee in France.
+## Résumé
 
-## Summary
+Checklist de solde de tout compte: préavis, congés payés, documents sociaux.
 
-Covers notice period pay, unused leave payout, and required social documents. Distinct from Belgium bonus workflows.
+## Intention de recherche
 
-## Key rules
+Trouver la règle applicable pour FR / Payroll / Termination.
 
-- Country: France (`FR`)
+## Corps de connaissance
+
+Le solde final doit inclure les congés payés non pris et l’indemnité de préavis lorsque applicable.
+
+## Preuves source
+
+- Source label: France Termination Checklist (procedure)
+- Country: FR
 - Domain: Payroll
 - Topic: Termination
+- Excerpt: "Le solde final doit inclure les congés payés non pris et l’indemnité de préavis lorsque applicable...."
 
-## Provenance
+## Liens candidats
 
-Source label: France Termination Procedure  
-Excerpt: "Final settlement must include unused paid leave and notice indemnity where applicable."
+- [[France Final Payslip Guide]]
+- [[Teams FR Termination Shortcuts]]
+- [[Expert Note Camille Durand Termination]]
 
-## Related
+## Alertes
 
-- [[Belgium Bonus Procedure 2026]]
+- (aucune)

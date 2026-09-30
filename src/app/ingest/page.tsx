@@ -64,8 +64,16 @@ export default function IngestPage() {
         warning: data.warning,
         mode: data.mode,
         detected: data.detected,
+        action: data.action,
+        knowledgeType: data.knowledgeType,
+        resume: data.resume,
+        alertes: data.alertes,
+        written: data.written,
+        cardId: data.cardId,
       });
-      await refreshNotes();
+      if (data.written) {
+        await refreshNotes();
+      }
     } catch {
       setError("Network error while calling /api/ingest.");
     } finally {
@@ -86,15 +94,23 @@ export default function IngestPage() {
           <Compass className="h-5 w-5 shrink-0 text-[var(--accent-bright)]" />
           <span className="truncate text-sm tracking-wide">Knowledge Compass</span>
         </Link>
-        <a
-          href={quartzUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex shrink-0 items-center gap-1.5 text-sm text-[var(--accent-bright)] transition hover:text-white"
-        >
-          Open Quartz graph
-          <ArrowUpRight className="h-4 w-4" />
-        </a>
+        <div className="flex shrink-0 items-center gap-3">
+          <Link
+            href="/notes"
+            className="text-sm text-white/70 transition hover:text-white"
+          >
+            Browse Markdown
+          </Link>
+          <a
+            href={quartzUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm text-[var(--accent-bright)] transition hover:text-white"
+          >
+            Open Quartz graph
+            <ArrowUpRight className="h-4 w-4" />
+          </a>
+        </div>
       </header>
 
       <main className="relative z-10 mx-auto grid w-full max-w-6xl gap-6 px-4 pb-16 pt-2 sm:gap-8 sm:px-6 sm:pt-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.9fr)]">

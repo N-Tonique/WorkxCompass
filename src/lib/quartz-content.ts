@@ -166,3 +166,178 @@ export async function deleteQuartzNote(
   return { filename: base };
 }
 
+export type ExistingCard = {
+  id?: string;
+  title: string;
+  filename: string;
+  absolutePath: string;
+  markdown: string;
+  source?: string;
+  sourceFingerprint?: string;
+  version?: string;
+  knowledgeType?: string;
+  domaine?: string;
+  sousDomaine?: string;
+  statut?: string;
+};
+
+function parseFm(block: string, key: string): string | undefined {
+  const line = block.split("\n").find((l) => new RegExp(`^${key}\\s*:`).test(l));
+  if (!line) return undefined;
+  return line
+    .replace(new RegExp(`^${key}\\s*:`), "")
+    .trim()
+    .replace(/^["']|["']$/g, "");
+}
+
+export async function listExistingCards(): Promise<ExistingCard[]> {
+  const dir = getQuartzContentDir();
+  let entries: string[] = [];
+  try {
+    entries = await fs.readdir(dir);
+  } catch {
+    return [];
+  }
+
+  const cards: ExistingCard[] = [];
+  for (const filename of entries) {
+    if (!filename.endsWith(".md") || filename.toLowerCase() === "index.md") {
+      continue;
+    }
+    const absolutePath = path.join(dir, filename);
+    const markdown = await fs.readFile(absolutePath, "utf8");
+    const fm = markdown.match(/^---\s*\n([\s\S]*?)\n---/)?.[1] ?? "";
+    const title =
+      parseFm(fm, "title") ||
+      parseFm(fm, "titre") ||
+      filename.replace(/\.md$/, "");
+    cards.push({
+      id: parseFm(fm, "id") || parseFm(fm, "ID"),
+      title,
+      filename,
+      absolutePath,
+      markdown,
+      source: parseFm(fm, "source"),
+      sourceFingerprint:
+        parseFm(fm, "sourceFingerprint") || parseFm(fm, "empreinte"),
+      version: parseFm(fm, "version"),
+      knowledgeType:
+        parseFm(fm, "knowledgeType") || parseFm(fm, "knowledge_type"),
+      domaine: parseFm(fm, "domaine") || parseFm(fm, "domain"),
+      sousDomaine:
+        parseFm(fm, "sous-domaine") ||
+        parseFm(fm, "sous_domaine") ||
+        parseFm(fm, "sousDomaine"),
+      statut: parseFm(fm, "statut") || parseFm(fm, "status"),
+    });
+  }
+  return cards;
+}
+
+export function findMatchingCard(
+  cards: ExistingCard[],
+  opts: { fingerprint: string; sourceLabel: string },
+): ExistingCard | undefined {
+  const byFp = cards.find((c) => c.sourceFingerprint === opts.fingerprint);
+  if (byFp) return byFp;
+  const label = opts.sourceLabel.toLowerCase();
+  return cards.find(
+    (c) =>
+      (c.source && c.source.toLowerCase() === label) ||
+      c.filename.toLowerCase() === `${label}.md`.toLowerCase() ||
+      c.filename.toLowerCase() === label,
+  );
+}
+
+export async function pathUsedByOtherId(
+  proposedFilename: string,
+  cardId: string,
+): Promise<boolean> {
+  const base = path.basename(proposedFilename);
+  const dir = getQuartzContentDir();
+  const absolutePath = path.join(dir, base);
+  try {
+    const markdown = await fs.readFile(absolutePath, "utf8");
+    const fm = markdown.match(/^---\s*\n([\s\S]*?)\n---/)?.[1] ?? "";
+    const existingId = parseFm(fm, "id") || parseFm(fm, "ID");
+    if (!existingId) return true; // occupied without id — treat as conflict
+    return existingId !== cardId;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+export async function writeQuartzNoteAtFilename(
+  filename: string,
+  markdown: string,
+): Promise<{ filename: string; slug: string; absolutePath: string }> {
+  const base = path.basename(filename);
+  if (!base.endsWith(".md") || base.includes("..")) {
+    throw new Error("Invalid note filename.");
+  }
+  const dir = getQuartzContentDir();
+  await fs.mkdir(dir, { recursive: true });
+  const absolutePath = path.join(dir, base);
+  const resolvedDir = path.resolve(dir);
+  const resolvedFile = path.resolve(absolutePath);
+  if (!resolvedFile.startsWith(resolvedDir + path.sep)) {
+    throw new Error("Invalid note path.");
+  }
+  await fs.writeFile(
+    absolutePath,
+    markdown.endsWith("\n") ? markdown : `${markdown}\n`,
+    "utf8",
+  );
+  return {
+    filename: base,
+    slug: slugifyTitle(base.replace(/\.md$/, "")),
+    absolutePath,
+  };
+}
+
+export async function readQuartzNote(filename: string): Promise<{
+  filename: string;
+  title: string;
+  markdown: string;
+  body: string;
+  tags: string[];
+  links: string[];
+}> {
+  const base = path.basename(filename);
+  if (!base || base !== filename || base.includes("..") || !base.endsWith(".md")) {
+    throw new Error("Invalid note filename.");
+  }
+
+  const dir = getQuartzContentDir();
+  const absolutePath = path.join(dir, base);
+  const resolvedDir = path.resolve(dir);
+  const resolvedFile = path.resolve(absolutePath);
+  if (!resolvedFile.startsWith(resolvedDir + path.sep)) {
+    throw new Error("Invalid note path.");
+  }
+
+  let markdown: string;
+  try {
+    markdown = await fs.readFile(resolvedFile, "utf8");
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") throw new Error("Note not found.");
+    throw error;
+  }
+
+  const title =
+    extractFrontmatterTitle(markdown) ?? base.replace(/\.md$/, "");
+  const body = markdown.replace(/^---\s*\n[\s\S]*?\n---\s*/, "");
+
+  return {
+    filename: base,
+    title,
+    markdown,
+    body,
+    tags: extractTags(markdown),
+    links: extractWikilinks(markdown),
+  };
+}
+

@@ -1,36 +1,50 @@
 ---
+id: 26af7002-468a-4634-904e-e2887aff4714
+version: 1
 title: Belgium Bonus Procedure 2026
-tags:
-  - Payroll
-  - BE
-  - Bonus
-  - procedure
+titre: Belgium Bonus Procedure 2026
+source: demo://procedure/Belgium%20Bonus%20Procedure%202026
+sourceFingerprint: 9fc9401c9e6ff896
+knowledgeType: procedure
 sourceType: procedure
+language: en
 country: BE
+domaine: Payroll
 domain: Payroll
+sous-domaine: Bonus
+topic: Bonus
+statut: active
+tags: ["Payroll", "BE", "Bonus", "en", "procedure"]
 ---
 
 # Belgium Bonus Procedure 2026
 
-Official SD Worx procedure for calculating annual bonuses in Belgium for payroll year 2026.
+## Résumé
 
-## Summary
+Official eligibility: 6 months continuous employment; bonus base excludes overtime; paid with March payroll.
 
-Belgium bonus eligibility requires continuous employment of at least 6 months in the reference year. The bonus base is contractual annual salary excluding overtime. Payment is processed with the March payroll of the following year.
+## Intention de recherche
 
-## Key rules
+Trouver la règle applicable pour BE / Payroll / Bonus.
 
-- Country: Belgium (`BE`)
+## Corps de connaissance
+
+Eligibility requires continuous employment of at least 6 months in the reference year. The bonus base is contractual annual salary excluding overtime. Payment is processed with the March payroll of the following year.
+
+## Preuves source
+
+- Source label: Belgium Bonus Procedure 2026 (procedure)
+- Country: BE
 - Domain: Payroll
 - Topic: Bonus
-- Valid from: 2026-01-01
+- Excerpt: "Eligibility requires continuous employment of at least 6 months in the reference year. The bonus base is contractual annual salary excluding overtime. Payment i..."
 
-## Provenance
-
-Source label: Official Belgium Bonus Procedure 2026  
-Excerpt: "Bonus eligibility requires continuous employment of at least 6 months in the reference year."
-
-## Related
+## Liens candidats
 
 - [[Teams Bonus Calculation Draft]]
-- [[France Termination Checklist]]
+- [[Belgium Payroll Calendar 2026]]
+- [[Expert Note Sophie Lambert Bonus]]
+
+## Alertes
+
+- (aucune)

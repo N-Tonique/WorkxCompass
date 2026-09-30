@@ -1,17 +1,15 @@
+import { createHash, randomUUID } from "node:crypto";
 import { GoogleGenAI } from "@google/genai";
 import {
-  extractFrontmatterTitle,
+  type ExistingCard,
   extractWikilinks,
+  findMatchingCard,
+  listExistingCards,
+  pathUsedByOtherId,
   slugifyTitle,
+  writeQuartzNote,
+  writeQuartzNoteAtFilename,
 } from "@/lib/quartz-content";
-
-export type IngestMeta = {
-  country?: string;
-  domain?: string;
-  topic?: string;
-  sourceType?: string;
-  language?: string;
-};
 
 export type DetectedAttributes = {
   sourceType: string;
@@ -22,12 +20,37 @@ export type DetectedAttributes = {
   fileKind: string;
 };
 
+export type IngestAction = "unchanged" | "create" | "update" | "needs_review";
+
+export type StructuredIngestResponse = {
+  action: IngestAction;
+  titre_propose: string;
+  resume: string;
+  knowledgeType: string;
+  flashcard: unknown;
+  Preuves_Source: unknown;
+  Relations_Candidates: unknown;
+  liens_a_recalculer: string[];
+  markdown_content: string;
+  Alertes: string[];
+};
+
 export type IngestResult = {
   title: string;
   slug: string;
   markdown: string;
   links: string[];
   detected: DetectedAttributes;
+  action: IngestAction;
+  knowledgeType?: string;
+  resume?: string;
+  alertes: string[];
+  liensARecalculer: string[];
+  written: boolean;
+  filename?: string;
+  cardId?: string;
+  mode: "vertex" | "local-fallback";
+  warning?: string;
 };
 
 const TEXT_MIME = new Set([
@@ -39,77 +62,268 @@ const TEXT_MIME = new Set([
   "text/xml",
 ]);
 
-function buildPrompt(existingTitles: string[], filename: string, mimeType: string) {
+export function computeSourceFingerprint(bytes: Buffer): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function inferSourceFormat(filename: string, mimeType: string): "pdf" | "email_msg" | "teams" {
+  const hay = `${filename} ${mimeType}`.toLowerCase();
+  if (hay.includes("teams") || hay.includes("chat")) return "teams";
+  if (
+    hay.includes("email") ||
+    hay.includes("msg") ||
+    hay.includes("eml") ||
+    hay.includes("outlook")
+  ) {
+    return "email_msg";
+  }
+  if (hay.includes("pdf") || filename.toLowerCase().endsWith(".pdf")) return "pdf";
+  return "pdf";
+}
+
+function buildPrompt(params: {
+  filename: string;
+  mimeType: string;
+  fingerprint: string;
+  extractedText: string;
+  sourceDate: string;
+  existingCard?: ExistingCard;
+  existingTitles: string[];
+}) {
+  const {
+    filename,
+    mimeType,
+    fingerprint,
+    extractedText,
+    sourceDate,
+    existingCard,
+    existingTitles,
+  } = params;
   const titles =
     existingTitles.length > 0
       ? existingTitles.map((t) => `- ${t}`).join("\n")
-      : "- (none yet)";
+      : "- (aucune)";
+  const format = inferSourceFormat(filename, mimeType);
+  const sourceId = `src_${fingerprint.slice(0, 16)}`;
 
-  return `You are the Knowledge Compass ingestion engine for SD Worx.
-Analyze the uploaded organizational source and convert it into a Quartz-compatible Markdown note.
+  const carteBlock = existingCard
+    ? `CARTE_EXISTANTE:
+- id: ${existingCard.id ?? "(aucun)"}
+- titre: ${existingCard.title}
+- fichier: ${existingCard.filename}
+- source: ${existingCard.source ?? "(inconnue)"}
+- empreinte: ${existingCard.sourceFingerprint ?? "(inconnue)"}
+- version: ${existingCard.version ?? "1"}
+- knowledgeType: ${existingCard.knowledgeType ?? "(inconnu)"}
+- domaine: ${existingCard.domaine ?? "(inconnu)"}
+- sous-domaine: ${existingCard.sousDomaine ?? "(inconnu)"}
+- statut: ${existingCard.statut ?? "(inconnu)"}
+- markdown:
+\`\`\`markdown
+${existingCard.markdown.slice(0, 6000)}
+\`\`\``
+    : `CARTE_EXISTANTE: aucune (première ingestion de cette source).`;
 
-IMPORTANT — detect automatically from the file (do NOT ask the user):
-- sourceType: one of pdf | teams | expert_note | procedure (infer from content/style/filename; MIME hint=${mimeType})
-- language: ISO 639-1 code of the source content (fr, en, nl, de, …)
-- country: ISO country if inferable (prefer BE or FR when relevant), else omit
-- domain: Payroll | Time | HR | Tax | Benefits | Other when inferable
-- topic: short topic label (e.g. Bonus, Termination, Overtime, Leave, …)
+  const excerptBlock =
+    extractedText.trim().length > 0
+      ? extractedText.slice(0, 8000)
+      : "(aucun texte extractible fourni — analyser le binaire joint si disponible)";
 
-Requirements:
-1. Start with YAML frontmatter between --- fences including ALL of:
-   - title
-   - tags (array including domain, country, topic, language when known)
-   - sourceType
-   - language
-   - country (if known)
-   - domain (if known)
-   - topic (if known)
-2. Write a clear # Title heading matching frontmatter title.
-3. Include sections: ## Summary, ## Detected context, ## Key rules (if applicable), ## Provenance, ## Related.
-4. In ## Detected context, list the auto-detected sourceType, language, country, domain, topic.
-5. In ## Related, add Obsidian-style wikilinks [[Exact Existing Title]] only when relevant.
-6. Prefer linking to these existing notes when topical overlap exists:
+  return `Ta tâche est d’analyser une source interne, de remplir une flashcard fidèle à cette source et de préparer la création ou la mise à jour de sa fiche Markdown.
+
+Entrées fournies
+
+SOURCE : identifiant stable, chemin ou URL, format (pdf, email_msg ou teams), version/empreinte, date et texte extrait avec emplacements (page, paragraphe ou ID de message).
+
+SOURCE:
+- identifiant_stable: ${sourceId}
+- chemin_ou_url: ${filename}
+- format: ${format}
+- mimeType: ${mimeType}
+- version_empreinte: ${fingerprint}
+- date: ${sourceDate}
+- texte_extrait_avec_emplacements:
+"""
+${excerptBlock}
+"""
+
+${carteBlock}
+
+Compare l’empreinte de SOURCE à celle de CARTE_EXISTANTE.
+
+Même empreinte : action unchanged, aucune réécriture.
+
+Nouvelle source : action create.
+
+Source modifiée : action update, avec conservation de l’ID et liste des liens à recalculer.
+
+Information trop ambiguë ou source inexploitable : action needs_review, avec explication.
+
+Prépare un Markdown contenant un frontmatter avec ID, version, titre, source, knowledgeType, domaine, sous-domaine et statut, puis les sections : Résumé, Intention de recherche, Corps de connaissance, Preuves source, Liens candidats et Alertes. Le Markdown doit correspondre exactement aux champs structurés.
+
+Retourne uniquement une réponse structurée contenant : action, titre_propose, resume, knowledgeType, flashcard, Preuves_Source, Relations_Candidates, liens_a_recalculer, markdown_content et Alertes.
+
+Si tu disposes d’un outil d’écriture, écris ou mets à jour le fichier seulement après validation de la réponse et vérification qu’aucun autre ID n’utilise son chemin. Sinon, retourne le contenu et l’action proposée. Ne prétends jamais avoir modifié un fichier sans confirmation de l’outil.
+
+Retourne UNIQUEMENT une réponse JSON valide (pas de prose hors JSON) contenant :
+{
+  "action": "unchanged" | "create" | "update" | "needs_review",
+  "titre_propose": string,
+  "resume": string,
+  "knowledgeType": string,
+  "flashcard": object,
+  "Preuves_Source": array|object,
+  "Relations_Candidates": array,
+  "liens_a_recalculer": string[],
+  "markdown_content": string,
+  "Alertes": string[]
+}
+
+Contraintes Markdown (markdown_content):
+- Frontmatter YAML avec: id, version, titre (ou title), source, sourceFingerprint, knowledgeType, domaine, sous-domaine, statut, tags
+- Sections exactes:
+  ## Résumé
+  ## Intention de recherche
+  ## Corps de connaissance
+  ## Preuves source
+  ## Liens candidats
+  ## Alertes
+- Dans Liens candidats, utilise des wikilinks [[Titre Exact]] vers les notes pertinentes.
+- Notes existantes utilisables pour les liens:
 ${titles}
-7. Keep content factual, professional, HR/payroll plausible.
-8. If the source is thin, still produce a useful summary note; do not invent legal advice.
-9. Output ONLY the Markdown document — no code fences wrapping the whole file.
 
-Filename hint: ${filename}
+Si action=unchanged, markdown_content peut reprendre la carte existante.
+Si action=update, conserve le même id que CARTE_EXISTANTE.
+Si action=create, génère un nouvel id UUID.
+Si action=needs_review, explique dans Alertes pourquoi.
 `;
 }
 
-function parseFrontmatterValue(block: string, key: string): string | undefined {
-  const line = block
-    .split("\n")
-    .find((l) => new RegExp(`^${key}\\s*:`).test(l));
-  if (!line) return undefined;
-  return line
-    .replace(new RegExp(`^${key}\\s*:`), "")
-    .trim()
-    .replace(/^["']|["']$/g, "");
+function stripCodeFences(text: string): string {
+  let t = text.trim();
+  if (t.startsWith("```")) {
+    t = t.replace(/^```(?:json|markdown|md)?\s*/i, "").replace(/\s*```$/, "");
+  }
+  return t.trim();
 }
 
-function extractFrontmatterBlock(markdown: string): string | null {
-  const match = markdown.match(/^---\s*\n([\s\S]*?)\n---/);
-  return match?.[1] ?? null;
-}
-
-export function extractDetectedAttributes(
-  markdown: string,
-  fallback: DetectedAttributes,
-): DetectedAttributes {
-  const block = extractFrontmatterBlock(markdown);
-  if (!block) return fallback;
-
+function parseStructuredResponse(raw: string): StructuredIngestResponse {
+  const cleaned = stripCodeFences(raw);
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start < 0 || end < start) {
+    throw new Error("Réponse IA non JSON.");
+  }
+  const parsed = JSON.parse(cleaned.slice(start, end + 1)) as Partial<StructuredIngestResponse>;
+  const action = parsed.action;
+  if (
+    action !== "unchanged" &&
+    action !== "create" &&
+    action !== "update" &&
+    action !== "needs_review"
+  ) {
+    throw new Error(`Action IA invalide: ${String(action)}`);
+  }
   return {
-    sourceType: parseFrontmatterValue(block, "sourceType") || fallback.sourceType,
-    language: parseFrontmatterValue(block, "language") || fallback.language,
-    country: parseFrontmatterValue(block, "country") || fallback.country,
-    domain: parseFrontmatterValue(block, "domain") || fallback.domain,
-    topic: parseFrontmatterValue(block, "topic") || fallback.topic,
-    fileKind: fallback.fileKind,
+    action,
+    titre_propose: String(parsed.titre_propose ?? "Sans titre"),
+    resume: String(parsed.resume ?? ""),
+    knowledgeType: String(parsed.knowledgeType ?? "unknown"),
+    flashcard: parsed.flashcard ?? {},
+    Preuves_Source: parsed.Preuves_Source ?? [],
+    Relations_Candidates: parsed.Relations_Candidates ?? [],
+    liens_a_recalculer: Array.isArray(parsed.liens_a_recalculer)
+      ? parsed.liens_a_recalculer.map(String)
+      : [],
+    markdown_content: String(parsed.markdown_content ?? ""),
+    Alertes: Array.isArray(parsed.Alertes) ? parsed.Alertes.map(String) : [],
   };
 }
+
+function ensureStructuredMarkdown(
+  markdown: string,
+  opts: {
+    id: string;
+    version: string;
+    title: string;
+    source: string;
+    fingerprint: string;
+    knowledgeType: string;
+    domaine?: string;
+    sousDomaine?: string;
+    statut: string;
+    resume: string;
+    alertes: string[];
+    relations: unknown;
+  },
+): string {
+  let md = stripCodeFences(markdown);
+  if (md.startsWith("---")) return md;
+
+  const relations = Array.isArray(opts.relations)
+    ? opts.relations
+    : [];
+  const linkLines = relations
+    .map((r) => {
+      if (typeof r === "string") return `- [[${r}]]`;
+      if (r && typeof r === "object" && "titre" in r) {
+        return `- [[${String((r as { titre: string }).titre)}]]`;
+      }
+      if (r && typeof r === "object" && "title" in r) {
+        return `- [[${String((r as { title: string }).title)}]]`;
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  return [
+    "---",
+    `id: ${opts.id}`,
+    `version: ${opts.version}`,
+    `title: ${opts.title}`,
+    `titre: ${opts.title}`,
+    `source: ${opts.source}`,
+    `sourceFingerprint: ${opts.fingerprint}`,
+    `knowledgeType: ${opts.knowledgeType}`,
+    opts.domaine ? `domaine: ${opts.domaine}` : null,
+    opts.sousDomaine ? `sous-domaine: ${opts.sousDomaine}` : null,
+    `statut: ${opts.statut}`,
+    "---",
+    "",
+    `# ${opts.title}`,
+    "",
+    "## Résumé",
+    "",
+    opts.resume || "(vide)",
+    "",
+    "## Intention de recherche",
+    "",
+    `Trouver la connaissance applicable issue de \`${opts.source}\`.`,
+    "",
+    "## Corps de connaissance",
+    "",
+    opts.resume || "(à compléter)",
+    "",
+    "## Preuves source",
+    "",
+    `- Source: ${opts.source}`,
+    `- Empreinte: ${opts.fingerprint}`,
+    "",
+    "## Liens candidats",
+    "",
+    ...(linkLines.length > 0 ? linkLines : ["- (aucun)"]),
+    "",
+    "## Alertes",
+    "",
+    ...(opts.alertes.length > 0
+      ? opts.alertes.map((a) => `- ${a}`)
+      : ["- (aucune)"]),
+    "",
+  ]
+    .filter((l) => l !== null)
+    .join("\n");
+}
+
 
 function detectLanguageHeuristic(text: string): string {
   const sample = text.toLowerCase();
@@ -208,74 +422,10 @@ export function detectAttributesLocally(params: {
   };
 }
 
-function ensureFrontmatter(
-  markdown: string,
-  detected: DetectedAttributes,
-  fallbackTitle: string,
-): string {
-  let md = markdown.trim();
-  if (md.startsWith("```")) {
-    md = md.replace(/^```(?:markdown|md)?\n?/i, "").replace(/\n?```$/i, "").trim();
-  }
-
-  if (!md.startsWith("---")) {
-    const tags = [
-      detected.domain,
-      detected.country,
-      detected.topic,
-      detected.language,
-      detected.sourceType,
-    ].filter(Boolean);
-    const fm = [
-      "---",
-      `title: ${fallbackTitle}`,
-      `tags: [${tags.map((t) => JSON.stringify(String(t))).join(", ")}]`,
-      `sourceType: ${detected.sourceType}`,
-      `language: ${detected.language}`,
-      detected.country ? `country: ${detected.country}` : null,
-      detected.domain ? `domain: ${detected.domain}` : null,
-      detected.topic ? `topic: ${detected.topic}` : null,
-      `fileKind: ${detected.fileKind}`,
-      "---",
-      "",
-      `# ${fallbackTitle}`,
-      "",
-    ]
-      .filter((line) => line !== null)
-      .join("\n");
-    md = `${fm}${md}`;
-  } else {
-    // Enrich missing keys in existing frontmatter.
-    const block = extractFrontmatterBlock(md) ?? "";
-    const missing: string[] = [];
-    if (!parseFrontmatterValue(block, "language")) {
-      missing.push(`language: ${detected.language}`);
-    }
-    if (!parseFrontmatterValue(block, "sourceType")) {
-      missing.push(`sourceType: ${detected.sourceType}`);
-    }
-    if (detected.country && !parseFrontmatterValue(block, "country")) {
-      missing.push(`country: ${detected.country}`);
-    }
-    if (detected.domain && !parseFrontmatterValue(block, "domain")) {
-      missing.push(`domain: ${detected.domain}`);
-    }
-    if (detected.topic && !parseFrontmatterValue(block, "topic")) {
-      missing.push(`topic: ${detected.topic}`);
-    }
-    if (missing.length > 0) {
-      md = md.replace(/^---\s*\n/, `---\n${missing.join("\n")}\n`);
-    }
-  }
-
-  return md;
-}
-
 export type VertexEndpoint = {
   project: string;
   location: string;
   model: string;
-  /** Agent Platform / Vertex cloud backend (ADC). */
   enterprise: boolean;
 };
 
@@ -293,14 +443,11 @@ export function getVertexConfig(): VertexEndpoint {
   return { project, location, model, enterprise };
 }
 
-/** Ordered attempts for Qwiklabs / Agent Platform labs. */
 export function getVertexEndpointCandidates(): VertexEndpoint[] {
   const primary = getVertexConfig();
   const project = primary.project;
   if (!project) return [];
 
-  // Prefer models commonly allowlisted in labs. Avoid gemini-2.5-* first —
-  // many Qwiklabs orgs block them via constraints/vertexai.allowedModels.
   const models = [
     primary.model,
     "gemini-2.0-flash-001",
@@ -316,12 +463,7 @@ export function getVertexEndpointCandidates(): VertexEndpoint[] {
   const candidates: VertexEndpoint[] = [];
   for (const location of locations) {
     for (const model of models) {
-      candidates.push({
-        project,
-        location,
-        model,
-        enterprise: true,
-      });
+      candidates.push({ project, location, model, enterprise: true });
     }
   }
 
@@ -357,110 +499,184 @@ function extractRoughText(bytes: Buffer, mimeType: string, filename: string): st
     /\.(md|txt|csv|json|xml)$/i.test(filename);
   if (isText) return bytes.toString("utf8").slice(0, 8000);
 
-  // Best-effort PDF text scrape (no external deps): keep printable runs.
   const asLatin = bytes.toString("latin1");
   const chunks = asLatin.match(/[\x20-\x7E\n\r\t]{5,}/g) ?? [];
   return chunks.join(" ").replace(/\s+/g, " ").trim().slice(0, 4000);
 }
 
-export function convertSourceLocally(params: {
+async function applyValidatedWrite(params: {
+  action: IngestAction;
+  structured: StructuredIngestResponse;
+  existingCard?: ExistingCard;
+  fingerprint: string;
+  sourceLabel: string;
+  detected: DetectedAttributes;
+}): Promise<{
+  written: boolean;
+  filename?: string;
+  markdown: string;
+  title: string;
+  cardId: string;
+  alertes: string[];
+}> {
+  const { action, structured, existingCard, fingerprint, sourceLabel, detected } =
+    params;
+  const alertes = [...structured.Alertes];
+  const cardId =
+    action === "update" && existingCard?.id
+      ? existingCard.id
+      : action === "unchanged" && existingCard?.id
+        ? existingCard.id
+        : randomUUID();
+
+  const version =
+    action === "update"
+      ? String(Number(existingCard?.version ?? "1") + 1)
+      : existingCard?.version ?? "1";
+
+  const markdown = ensureStructuredMarkdown(structured.markdown_content, {
+    id: cardId,
+    version,
+    title: structured.titre_propose,
+    source: sourceLabel,
+    fingerprint,
+    knowledgeType: structured.knowledgeType,
+    domaine: detected.domain,
+    sousDomaine: detected.topic,
+    statut:
+      action === "needs_review"
+        ? "needs_review"
+        : action === "unchanged"
+          ? existingCard?.statut ?? "active"
+          : "active",
+    resume: structured.resume,
+    alertes,
+    relations: structured.Relations_Candidates,
+  });
+
+  if (action === "unchanged" || action === "needs_review") {
+    return {
+      written: false,
+      filename: existingCard?.filename,
+      markdown:
+        action === "unchanged" && existingCard
+          ? existingCard.markdown
+          : markdown,
+      title: structured.titre_propose,
+      cardId,
+      alertes,
+    };
+  }
+
+  const targetFilename =
+    action === "update" && existingCard
+      ? existingCard.filename
+      : `${structured.titre_propose.replace(/[<>:"/\\|?*]/g, "").trim() || "carte"}.md`;
+
+  const conflict = await pathUsedByOtherId(targetFilename, cardId);
+  if (conflict) {
+    alertes.push(
+      `Chemin déjà utilisé par un autre ID: ${targetFilename}. Écriture annulée.`,
+    );
+    return {
+      written: false,
+      markdown,
+      title: structured.titre_propose,
+      cardId,
+      alertes,
+    };
+  }
+
+  const written =
+    action === "update"
+      ? await writeQuartzNoteAtFilename(targetFilename, markdown)
+      : await writeQuartzNote(structured.titre_propose, markdown);
+
+  return {
+    written: true,
+    filename: written.filename,
+    markdown,
+    title: structured.titre_propose,
+    cardId,
+    alertes,
+  };
+}
+
+export async function convertSourceLocally(params: {
   filename: string;
   mimeType: string;
   bytes: Buffer;
-  existingTitles: string[];
-}): IngestResult {
-  const { filename, mimeType, bytes, existingTitles } = params;
-  const title = titleFromFilename(filename);
+}): Promise<IngestResult> {
+  const { filename, mimeType, bytes } = params;
+  const fingerprint = computeSourceFingerprint(bytes);
+  const cards = await listExistingCards();
+  const existingCard = findMatchingCard(cards, {
+    fingerprint,
+    sourceLabel: filename,
+  });
   const excerpt = extractRoughText(bytes, mimeType, filename);
   const detected = detectAttributesLocally({
     filename,
     mimeType,
     text: excerpt,
   });
-  const summary =
-    excerpt.length > 40
-      ? excerpt.slice(0, 420)
-      : `Local ingest of ${filename} (Vertex models blocked by org policy). Auto-detected context applied.`;
 
-  const related = existingTitles
-    .filter((t) => {
-      const hay =
-        `${title} ${detected.topic ?? ""} ${detected.domain ?? ""} ${detected.country ?? ""}`.toLowerCase();
-      return t
-        .toLowerCase()
-        .split(/\s+/)
-        .some((token) => token.length > 3 && hay.includes(token));
-    })
-    .slice(0, 4);
-
-  if (related.length === 0 && existingTitles[0]) {
-    related.push(existingTitles[0]);
+  let action: IngestAction = "create";
+  if (existingCard?.sourceFingerprint === fingerprint) action = "unchanged";
+  else if (existingCard) action = "update";
+  if (excerpt.trim().length < 20 && !filename.toLowerCase().endsWith(".pdf")) {
+    action = "needs_review";
   }
 
-  const tags = [
-    detected.domain,
-    detected.country,
-    detected.topic,
-    detected.language,
-    detected.sourceType,
-  ].filter(Boolean);
+  const title = existingCard?.title ?? titleFromFilename(filename);
+  const cardId = existingCard?.id ?? randomUUID();
+  const structured: StructuredIngestResponse = {
+    action,
+    titre_propose: title,
+    resume:
+      excerpt.slice(0, 420) ||
+      "Source peu exploitable en fallback local.",
+    knowledgeType: detected.sourceType,
+    flashcard: {
+      question: `Que dit la source ${filename} ?`,
+      answer: excerpt.slice(0, 280) || "À revoir",
+    },
+    Preuves_Source: [{ source: filename, excerpt: excerpt.slice(0, 220) }],
+    Relations_Candidates: cards.slice(0, 3).map((c) => c.title),
+    liens_a_recalculer: action === "update" ? extractWikilinks(existingCard?.markdown ?? "") : [],
+    markdown_content: "",
+    Alertes:
+      action === "needs_review"
+        ? ["Fallback local: source ambiguë ou trop courte."]
+        : ["Fallback local (Vertex indisponible / policy)."],
+  };
 
-  const markdown = [
-    "---",
-    `title: ${title}`,
-    `tags: [${tags.map((t) => JSON.stringify(String(t))).join(", ")}]`,
-    `sourceType: ${detected.sourceType}`,
-    `language: ${detected.language}`,
-    detected.country ? `country: ${detected.country}` : null,
-    detected.domain ? `domain: ${detected.domain}` : null,
-    detected.topic ? `topic: ${detected.topic}` : null,
-    `fileKind: ${detected.fileKind}`,
-    "ingestMode: local-fallback",
-    "---",
-    "",
-    `# ${title}`,
-    "",
-    "## Summary",
-    "",
-    summary,
-    "",
-    "## Detected context",
-    "",
-    `- sourceType: ${detected.sourceType}`,
-    `- language: ${detected.language}`,
-    `- fileKind: ${detected.fileKind}`,
-    detected.country ? `- country: ${detected.country}` : null,
-    detected.domain ? `- domain: ${detected.domain}` : null,
-    detected.topic ? `- topic: ${detected.topic}` : null,
-    "",
-    "## Key rules",
-    "",
-    `- Source file: ${filename}`,
-    `- MIME: ${mimeType || "unknown"}`,
-    "",
-    "## Provenance",
-    "",
-    `Source label: ${filename}`,
-    excerpt
-      ? `Excerpt: "${excerpt.slice(0, 220).replace(/"/g, "'")}"`
-      : "Excerpt: (binary source — local fallback without Gemini)",
-    "",
-    "## Related",
-    "",
-    ...related.map((t) => `- [[${t}]]`),
-    "",
-    "> Generated by local fallback because Vertex org policy blocked Gemini models.",
-    "",
-  ]
-    .filter((line) => line !== null)
-    .join("\n");
+  const applied = await applyValidatedWrite({
+    action,
+    structured,
+    existingCard,
+    fingerprint,
+    sourceLabel: filename,
+    detected,
+  });
 
   return {
-    title,
-    slug: slugifyTitle(title),
-    markdown,
-    links: extractWikilinks(markdown),
+    title: applied.title,
+    slug: slugifyTitle(applied.title),
+    markdown: applied.markdown,
+    links: extractWikilinks(applied.markdown),
     detected,
+    action,
+    knowledgeType: structured.knowledgeType,
+    resume: structured.resume,
+    alertes: applied.alertes,
+    liensARecalculer: structured.liens_a_recalculer,
+    written: applied.written,
+    filename: applied.filename,
+    cardId: applied.cardId,
+    mode: "local-fallback",
+    warning:
+      "Vertex indisponible ou bloqué. Décision d'action et Markdown produits en fallback local.",
   };
 }
 
@@ -489,31 +705,64 @@ export async function convertSourceToMarkdown(params: {
   filename: string;
   mimeType: string;
   bytes: Buffer;
-  existingTitles: string[];
 }): Promise<IngestResult> {
-  const { filename, mimeType, bytes, existingTitles } = params;
+  const { filename, mimeType, bytes } = params;
   const allowLocal =
     process.env.INGEST_ALLOW_LOCAL_FALLBACK === undefined ||
     /^(1|true|yes)$/i.test(process.env.INGEST_ALLOW_LOCAL_FALLBACK ?? "true");
 
+  const fingerprint = computeSourceFingerprint(bytes);
+  const cards = await listExistingCards();
+  const existingCard = findMatchingCard(cards, {
+    fingerprint,
+    sourceLabel: filename,
+  });
+  const existingTitles = cards.map((c) => c.title);
   const roughText = extractRoughText(bytes, mimeType, filename);
-  const heuristic = detectAttributesLocally({
+  const detected = detectAttributesLocally({
     filename,
     mimeType,
     text: roughText,
   });
 
+  // Fast-path: same fingerprint already stored.
+  if (existingCard?.sourceFingerprint === fingerprint) {
+    return {
+      title: existingCard.title,
+      slug: slugifyTitle(existingCard.title),
+      markdown: existingCard.markdown,
+      links: extractWikilinks(existingCard.markdown),
+      detected,
+      action: "unchanged",
+      knowledgeType: existingCard.knowledgeType,
+      resume: "Empreinte identique — aucune réécriture.",
+      alertes: [],
+      liensARecalculer: [],
+      written: false,
+      filename: existingCard.filename,
+      cardId: existingCard.id,
+      mode: "vertex",
+    };
+  }
+
   const candidates = getVertexEndpointCandidates();
   if (candidates.length === 0) {
-    if (allowLocal) {
-      return convertSourceLocally({ filename, mimeType, bytes, existingTitles });
-    }
+    if (allowLocal) return convertSourceLocally({ filename, mimeType, bytes });
     throw new Error(
       "GOOGLE_CLOUD_PROJECT is missing. Set it in .env (Vertex AI + ADC).",
     );
   }
 
-  const prompt = buildPrompt(existingTitles, filename, mimeType);
+  const prompt = buildPrompt({
+    filename,
+    mimeType,
+    fingerprint,
+    extractedText: roughText,
+    sourceDate: new Date().toISOString(),
+    existingCard,
+    existingTitles,
+  });
+
   const isText =
     TEXT_MIME.has(mimeType) ||
     filename.endsWith(".md") ||
@@ -527,7 +776,7 @@ export async function convertSourceToMarkdown(params: {
 
   if (isText) {
     parts.push({
-      text: `\n\n--- SOURCE CONTENT (${filename}) ---\n${bytes.toString("utf8")}`,
+      text: `\n\n--- CONTENU SOURCE (${filename}) ---\n${bytes.toString("utf8")}`,
     });
   } else {
     parts.push({
@@ -555,27 +804,40 @@ export async function convertSourceToMarkdown(params: {
     }
   }
 
-  if (raw.trim()) {
-    const fallbackTitle = titleFromFilename(filename);
-    const markdown = ensureFrontmatter(raw, heuristic, fallbackTitle);
-    const title = extractFrontmatterTitle(markdown) ?? fallbackTitle;
-    const detected = extractDetectedAttributes(markdown, heuristic);
-    return {
-      title,
-      slug: slugifyTitle(title),
-      markdown,
-      links: extractWikilinks(markdown),
-      detected,
-    };
+  if (!raw.trim()) {
+    if (allowLocal) return convertSourceLocally({ filename, mimeType, bytes });
+    const detail =
+      lastError instanceof Error ? lastError.message : String(lastError ?? "");
+    throw new Error(
+      `No usable Vertex model. Org policy may block Gen AI models. Last error: ${detail}`,
+    );
   }
 
-  if (allowLocal) {
-    return convertSourceLocally({ filename, mimeType, bytes, existingTitles });
-  }
+  const structured = parseStructuredResponse(raw);
+  const applied = await applyValidatedWrite({
+    action: structured.action,
+    structured,
+    existingCard,
+    fingerprint,
+    sourceLabel: filename,
+    detected,
+  });
 
-  const detail =
-    lastError instanceof Error ? lastError.message : String(lastError ?? "");
-  throw new Error(
-    `No usable Vertex model. Org policy may block Gen AI models. Last error: ${detail}`,
-  );
+  return {
+    title: applied.title,
+    slug: slugifyTitle(applied.title),
+    markdown: applied.markdown,
+    links: extractWikilinks(applied.markdown),
+    detected,
+    action: structured.action,
+    knowledgeType: structured.knowledgeType,
+    resume: structured.resume,
+    alertes: applied.alertes,
+    liensARecalculer: structured.liens_a_recalculer,
+    written: applied.written,
+    filename: applied.filename,
+    cardId: applied.cardId,
+    mode: "vertex",
+  };
 }
+

@@ -33,6 +33,12 @@ export default function Home() {
             Ingest sources
             <ArrowRight className="h-4 w-4" />
           </Link>
+          <Link
+            href="/notes"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-sm text-white transition hover:border-white/40"
+          >
+            Browse Markdown
+          </Link>
           <a
             href="http://localhost:8080"
             target="_blank"

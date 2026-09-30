@@ -15,10 +15,16 @@ export type IngestPreviewData = {
   title: string;
   markdown: string;
   links: string[];
-  filename: string;
+  filename?: string;
   warning?: string;
   mode?: string;
   detected?: DetectedPreview;
+  action?: string;
+  knowledgeType?: string;
+  resume?: string;
+  alertes?: string[];
+  written?: boolean;
+  cardId?: string;
 };
 
 type IngestPreviewProps = {
@@ -34,7 +40,7 @@ export function IngestPreview({ data, loading, error }: IngestPreviewProps) {
         <div className="flex items-center gap-3 text-[var(--accent-bright)]">
           <Sparkles className="h-5 w-5 shrink-0 animate-pulse" />
           <p className="font-[family-name:var(--font-display)] text-lg">
-            Detecting type, language & context…
+            Comparaison d’empreinte & structuration…
           </p>
         </div>
         <div className="mt-5 space-y-3">
@@ -65,34 +71,44 @@ export function IngestPreview({ data, loading, error }: IngestPreviewProps) {
           Preview
         </p>
         <p className="mt-2 text-sm leading-relaxed">
-          After analysis, auto-detected attributes and Markdown will appear here.
+          L’IA compare l’empreinte SOURCE / CARTE_EXISTANTE puis propose
+          create, update, unchanged ou needs_review.
         </p>
       </div>
     );
   }
 
   const chips = [
+    data.action && `action: ${data.action}`,
+    data.written === false && "fichier: non modifié",
+    data.written === true && "fichier: écrit",
+    data.knowledgeType && `knowledgeType: ${data.knowledgeType}`,
     data.detected?.fileKind && `file: ${data.detected.fileKind}`,
-    data.detected?.sourceType && `type: ${data.detected.sourceType}`,
     data.detected?.language && `lang: ${data.detected.language}`,
     data.detected?.country && `country: ${data.detected.country}`,
     data.detected?.domain && `domain: ${data.detected.domain}`,
     data.detected?.topic && `topic: ${data.detected.topic}`,
+    data.cardId && `id: ${data.cardId.slice(0, 8)}…`,
   ].filter(Boolean) as string[];
 
   return (
     <div className="min-w-0 overflow-hidden rounded-2xl border border-white/15 bg-[#041820]/70 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
       <div className="border-b border-white/10 px-4 py-4 sm:px-6">
         <p className="text-xs uppercase tracking-[0.18em] text-[var(--accent-bright)]/80">
-          Written to quartz/content
+          Réponse structurée
           {data.mode === "local-fallback" ? " · local fallback" : ""}
         </p>
         <h3 className="mt-1 break-words font-[family-name:var(--font-display)] text-xl text-white sm:text-2xl">
           {data.title}
         </h3>
-        <p className="mt-1 truncate text-sm text-white/50" title={data.filename}>
-          {data.filename}
-        </p>
+        {data.filename ? (
+          <p className="mt-1 truncate text-sm text-white/50" title={data.filename}>
+            {data.filename}
+          </p>
+        ) : null}
+        {data.resume ? (
+          <p className="mt-2 text-sm leading-relaxed text-white/70">{data.resume}</p>
+        ) : null}
         {chips.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">
             {chips.map((chip) => (
@@ -105,6 +121,15 @@ export function IngestPreview({ data, loading, error }: IngestPreviewProps) {
             ))}
           </div>
         ) : null}
+        {data.alertes && data.alertes.length > 0 ? (
+          <ul className="mt-3 space-y-1 rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-xs leading-relaxed text-amber-100/90">
+            {data.alertes.map((a) => (
+              <li key={a} className="break-words">
+                {a}
+              </li>
+            ))}
+          </ul>
+        ) : null}
         {data.warning ? (
           <p className="mt-3 max-h-32 overflow-auto break-words rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-xs leading-relaxed text-amber-100/90">
             {data.warning}
@@ -116,7 +141,7 @@ export function IngestPreview({ data, loading, error }: IngestPreviewProps) {
         <div className="border-b border-white/10 px-4 py-4 sm:px-6">
           <div className="mb-2 flex items-center gap-2 text-sm text-white/70">
             <Link2 className="h-4 w-4 shrink-0 text-[var(--accent-bright)]" />
-            Detected connections
+            Liens candidats
           </div>
           <div className="flex flex-wrap gap-2">
             {data.links.map((link) => (
