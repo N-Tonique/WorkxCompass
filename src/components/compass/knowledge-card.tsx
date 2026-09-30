@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowUpRight, Check, ChevronDown, FileText, Fingerprint, GitCompareArrows, MessageSquare, Quote, ShieldCheck, TriangleAlert, UserRound, X } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, FileText, Fingerprint, GitCompareArrows, MessageSquare, Network, Quote, ShieldCheck, TriangleAlert, UserRound, X } from "lucide-react";
+import Image from "next/image";
 import type { Knowledge, Source } from "@/lib/compass-data";
+import { getRecommendedExperts, type ExpertContext } from "@/lib/expert-ranking";
 
 function DetailDialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -25,8 +27,13 @@ export function Sources({ sources, onSelect }: { sources: Source[]; onSelect: (s
   })}</div></section>;
 }
 
-export function ExpertRecommendation({ expert }: { expert: Knowledge["expert"] }) {
-  return <section className="expert-panel"><h3>Votre expert de référence</h3><div className="expert-person"><span className="avatar">{expert.initials}</span><div><strong>{expert.name}</strong><small>{expert.role}</small></div></div><details><summary>Pourquoi cet expert ?<ChevronDown size={15} /></summary><p>{expert.reason}</p><p className="demo-note">Profil fictif. Aucune demande n’est envoyée.</p></details></section>;
+export function ExpertRecommendation({ context }: { context: Knowledge["context"] }) {
+  const [top] = getRecommendedExperts({ country: context.Pays, domain: context.Domaine, topic: context.Sujet } as ExpertContext);
+  if (!top) return null;
+  const { expert, score } = top;
+  const fallback = expert.id === "knowledge-support";
+  const expertise = [...expert.topics, ...expert.domains, ...expert.countries].join(" · ") || "Support général";
+  return <section className="expert-panel"><h3>Votre expert de référence</h3><div className="expert-person"><Image className="avatar" src={expert.avatarUrl} alt="" width={38} height={38} /><div><strong>{expert.name}</strong><small>{expertise}</small></div></div><details><summary>Pourquoi cet expert ?<ChevronDown size={15} /></summary><p>{fallback ? "Aucun expert ne couvre ce contexte : l’équipe support prend le relais." : `Correspondance ${Math.round(score)}/15 sur le pays, le domaine et le sujet · ${expert.solvedCases} cas résolus.`}</p><p className="demo-note">Profil fictif. Aucune demande n’est envoyée.</p></details></section>;
 }
 
 export function Conflict({ knowledge, onSource }: { knowledge: Knowledge; onSource: (source: Source) => void }) {
@@ -34,10 +41,10 @@ export function Conflict({ knowledge, onSource }: { knowledge: Knowledge; onSour
   return <><span className="conflict-status"><TriangleAlert size={14} />{conflict.status}</span><p>{conflict.explanation}</p><div className="conflict-comparison">{conflict.sourceIds.map((id, index) => {
     const source = knowledge.sources.find(item => item.id === id)!;
     return <section key={id}><span className="small-label">{index === 0 ? "Source officielle du scénario" : "Information contradictoire"}</span><h3>{source.name}</h3><Evidence source={source} /><button className="text-button" onClick={() => onSource(source)}>Voir la provenance<ArrowUpRight size={15} /></button></section>;
-  })}</div><ExpertRecommendation expert={knowledge.expert} /></>;
+  })}</div><ExpertRecommendation context={knowledge.context} /></>;
 }
 
-export function KnowledgeCard({ knowledge }: { knowledge: Knowledge }) {
+export function KnowledgeCard({ knowledge, onGraph }: { knowledge: Knowledge; onGraph: () => void }) {
   const [source, setSource] = useState<Source | null>(null);
   const [conflictOpen, setConflictOpen] = useState(false);
   return <div className="knowledge-layout"><article className="knowledge-card"><header className="knowledge-header"><div className="card-meta"><span><Fingerprint size={16} />Knowledge Card</span><span>{knowledge.id}</span></div><h1 tabIndex={-1}>{knowledge.title}</h1><p className="knowledge-summary">{knowledge.summary}</p><div className="knowledge-status">{knowledge.conflict ? <><TriangleAlert size={15} />Validation requise</> : <><ShieldCheck size={15} />Sources concordantes dans cette démo</>}</div></header>
@@ -47,7 +54,7 @@ export function KnowledgeCard({ knowledge }: { knowledge: Knowledge }) {
     <details className="evidence-details"><summary><span><Quote size={17} />Toutes les preuves</span><ChevronDown size={17} /></summary>{knowledge.sources.map(item => <section key={item.id}><h4>{item.name}</h4><Evidence source={item} /></section>)}</details>
     </div><footer className="card-footer">Démonstration · contenu et sources fictifs, sans valeur de conseil métier.</footer></article>
     <aside className="knowledge-aside"><section className="relevance-panel"><div className="relevance-heading"><span>Pertinence contextuelle</span><strong>{knowledge.score}<small>%</small></strong></div><div className="score-track"><span style={{ width: `${knowledge.score}%` }} /></div><details open><summary>Pourquoi cette connaissance ?<ChevronDown size={15} /></summary><ul>{knowledge.reasons.map(reason => <li key={reason}><Check size={15} />{reason}</li>)}</ul></details><p className="demo-note">Score de démonstration, non calculé. Il ne mesure pas la fiabilité de la règle.</p></section>
-    <section className="context-panel"><h3>Contexte d’application</h3><dl>{Object.entries(knowledge.context).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl></section><ExpertRecommendation expert={knowledge.expert} /></aside>
+    <section className="context-panel"><h3>Contexte d’application</h3><dl>{Object.entries(knowledge.context).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value}</dd></div>)}</dl><button className="text-button" onClick={onGraph}>Voir les connaissances liées<Network size={15} /></button></section><ExpertRecommendation context={knowledge.context} /></aside>
     {source && <DetailDialog title={source.name} onClose={() => setSource(null)}><SourceDetails source={source} /></DetailDialog>}
     {conflictOpen && !source && <DetailDialog title={knowledge.conflict!.title} onClose={() => setConflictOpen(false)}><Conflict knowledge={knowledge} onSource={item => { setConflictOpen(false); setSource(item); }} /></DetailDialog>}
   </div>;

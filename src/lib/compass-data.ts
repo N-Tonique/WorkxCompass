@@ -19,7 +19,6 @@ export type Knowledge = {
   sources: Source[];
   score: number;
   reasons: string[];
-  expert: { name: string; role: string; initials: string; reason: string };
   conflict?: { title: string; sourceIds: [string, string]; status: string; explanation: string };
 };
 export type RefinementField = { id: string; label: string; options: string[] };
@@ -73,10 +72,9 @@ const knowledge: Record<Intent["scenario"], Knowledge> = {
     score: 96, reasons: ["Pays correspondant : Belgique", "Domaine correspondant : Payroll", "Intention correspondant au bonus", "Manuel interne disponible"],
     sources: [
       { id: "bonus-policy", name: "Politique de rémunération", type: "PDF / Manuel", origin: "SharePoint · RH Belgique", locator: "Section 4.2 · p. 18", author: "Équipe Compensation & Benefits", date: "12 septembre 2026", excerpt: "Le bonus annuel est soumis à la validation des objectifs et du montant par le responsable. Le temps de présence est pris en compte." },
-      { id: "bonus-teams", name: "Clôture des bonus annuels", type: "Teams / Discussion", origin: "Teams · Payroll Belgique", locator: "Fil « Préparation des bonus »", author: "Els De Smet", date: "18 septembre 2026", excerpt: "Merci de joindre l’approbation du manager à chaque demande de versement avant la clôture payroll." },
-      { id: "bonus-expert", name: "Vérifier le prorata", type: "Note d’expert", origin: "Knowledge Compass · Contributions", locator: "Note BE-024", author: "Els De Smet", date: "20 septembre 2026", excerpt: "Pour une arrivée en cours d’année, vérifier le prorata individuellement avec RH avant validation définitive du bonus." },
+      { id: "bonus-teams", name: "Clôture des bonus annuels", type: "Teams / Discussion", origin: "Teams · Payroll Belgique", locator: "Fil « Préparation des bonus »", author: "Sophie Lambert", date: "18 septembre 2026", excerpt: "Merci de joindre l’approbation du manager à chaque demande de versement avant la clôture payroll." },
+      { id: "bonus-expert", name: "Vérifier le prorata", type: "Note d’expert", origin: "Knowledge Compass · Contributions", locator: "Note BE-024", author: "Sophie Lambert", date: "20 septembre 2026", excerpt: "Pour une arrivée en cours d’année, vérifier le prorata individuellement avec RH avant validation définitive du bonus." },
     ],
-    expert: { name: "Els De Smet", role: "Experte Payroll · Belgique", initials: "ES", reason: "Référente des politiques de rémunération et du calcul des bonus en Belgique." },
   },
   termination: {
     id: "KC-FR-028", title: "Départ d’un salarié : préparer la clôture",
@@ -88,10 +86,9 @@ const knowledge: Record<Intent["scenario"], Knowledge> = {
     score: 94, reasons: ["Pays correspondant : France", "Domaine correspondant : Payroll", "Intention correspondant à une fin de contrat", "Procédure RH documentée"],
     sources: [
       { id: "departure-policy", name: "Guide des départs", type: "PDF / Manuel", origin: "SharePoint · RH France", locator: "Chapitre 3 · p. 12", author: "Équipe RH France", date: "2 septembre 2026", excerpt: "Le dossier de départ est ouvert après confirmation par RH du motif et de la date de fin du contrat." },
-      { id: "departure-teams", name: "Checklist de sortie", type: "Teams / Discussion", origin: "Teams · Payroll France", locator: "Fil « Contrôles de sortie »", author: "Claire Moreau", date: "15 septembre 2026", excerpt: "Contrôler les variables et le solde de congés avant de préparer les documents de sortie." },
-      { id: "departure-expert", name: "Validation du dossier", type: "Note d’expert", origin: "Knowledge Compass · Contributions", locator: "Note FR-018", author: "Claire Moreau", date: "21 septembre 2026", excerpt: "En cas de désaccord sur la date ou les montants, faire revoir le dossier par le référent RH avant validation." },
+      { id: "departure-teams", name: "Checklist de sortie", type: "Teams / Discussion", origin: "Teams · Payroll France", locator: "Fil « Contrôles de sortie »", author: "Marc Durand", date: "15 septembre 2026", excerpt: "Contrôler les variables et le solde de congés avant de préparer les documents de sortie." },
+      { id: "departure-expert", name: "Validation du dossier", type: "Note d’expert", origin: "Knowledge Compass · Contributions", locator: "Note FR-018", author: "Marc Durand", date: "21 septembre 2026", excerpt: "En cas de désaccord sur la date ou les montants, faire revoir le dossier par le référent RH avant validation." },
     ],
-    expert: { name: "Claire Moreau", role: "Experte Payroll · France", initials: "CM", reason: "Référente du processus de départ et des contrôles de clôture en France." },
   },
   overtime: {
     id: "KC-BE-042", title: "Heures supplémentaires : travail du samedi",
@@ -104,10 +101,9 @@ const knowledge: Record<Intent["scenario"], Knowledge> = {
     sources: [
       { id: "time-policy", name: "Manuel du temps de travail", type: "PDF / Manuel", origin: "SharePoint · RH Belgique", locator: "Section 6.3 · p. 24", author: "Équipe Time & Attendance", date: "1 septembre 2026", excerpt: "Les heures supplémentaires du samedi sont majorées de 50 %. Le dimanche, la majoration prévue est de 100 %." },
       { id: "time-teams", name: "Travail du samedi · chantier Nord", type: "Teams / Discussion", origin: "Teams · Opérations Construction", locator: "Fil « Chantier Nord » · message 14", author: "Pieter Janssens", date: "19 septembre 2026", excerpt: "Pour le chantier Nord, les heures de ce samedi sont majorées de 100 %, selon l’accord évoqué en réunion." },
-      { id: "time-expert", name: "Accords propres aux chantiers", type: "Note d’expert", origin: "Knowledge Compass · Contributions", locator: "Note BE-031", author: "Sophie Vermeulen", date: "22 septembre 2026", excerpt: "Avant d’appliquer un taux propre à un chantier, obtenir l’accord écrit et vérifier les travailleurs et les dates couverts." },
+      { id: "time-expert", name: "Accords propres aux chantiers", type: "Note d’expert", origin: "Knowledge Compass · Contributions", locator: "Note BE-031", author: "Eline Peeters", date: "22 septembre 2026", excerpt: "Avant d’appliquer un taux propre à un chantier, obtenir l’accord écrit et vérifier les travailleurs et les dates couverts." },
     ],
     conflict: { title: "50 % ou 100 % pour le samedi ?", sourceIds: ["time-policy", "time-teams"], status: "À valider par un expert", explanation: "Le manuel décrit la règle générale, tandis que Teams évoque un accord local non joint. Impossible de confirmer que cet accord s’applique : les deux affirmations sont conservées, sans arbitrage automatique." },
-    expert: { name: "Sophie Vermeulen", role: "Experte Time · Construction", initials: "SV", reason: "Peut vérifier le périmètre de l’accord chantier et arbitrer la divergence de majoration." },
   },
 };
 

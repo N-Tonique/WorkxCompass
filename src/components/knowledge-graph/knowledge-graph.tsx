@@ -76,7 +76,8 @@ export function KnowledgeGraph({ cards, relations }: KnowledgeGraphProps) {
         id: `${relation.sourceId}--${relation.targetId}--${relation.kind}`,
         source: relation.sourceId,
         target: relation.targetId,
-        label: relation.reason,
+        label: relation.kind === "conflict_candidate" ? relation.reason : undefined,
+        ariaLabel: relation.reason,
         style: {
           strokeWidth: Math.min(1 + (relation.score ?? 0) / 5, 4),
           stroke: relation.kind === "conflict_candidate" ? "#f59e0b" : "#a1a1aa",
