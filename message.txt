@@ -1,0 +1,933 @@
+# Knowledge Compass — Répartition des tâches
+
+Équipe : 4 personnes
+
+- A : Frontend / UI / Knowledge Compass
+- B1 : Dataset / Knowledge Cards / Relations
+- B2 : Ranking / Scoring / Conflicts
+- C : Knowledge Graph / Experts / README / Demo
+
+---
+
+# 🔵 RÔLE A — UI / Knowledge Compass
+**1 personne**
+
+## Objectif
+
+Construire toute l'interface visible du prototype.
+
+L'utilisateur doit pouvoir sélectionner un contexte métier et voir immédiatement
+les connaissances recommandées, leurs scores, leurs sources, les conflits et
+l'expert recommandé.
+
+## Tâches
+
+### 1. Structure de l'application
+
+Créer l'interface principale simulant un environnement mySDWorx.
+
+Fichiers principaux :
+
+src/app/page.tsx
+
+src/components/
+  knowledge-compass/
+  knowledge-card/
+  context-selector/
+
+### 2. Context Selector
+
+Créer un sélecteur permettant de choisir entre :
+
+- Belgium / Payroll / Bonus
+- France / Payroll / Termination
+- Belgium / Time / Overtime
+
+Afficher clairement le contexte actif :
+
+- Country
+- Domain
+- Topic
+- Year
+
+### 3. Knowledge Compass
+
+Créer la zone affichant les connaissances recommandées.
+
+Le changement de contexte doit automatiquement changer les résultats.
+
+Pas de chatbot.
+Pas besoin de barre de recherche.
+
+### 4. Knowledge Card
+
+Créer le composant d'affichage d'une connaissance.
+
+Afficher :
+
+- titre
+- résumé
+- type de source
+- score
+- pays
+- domaine
+- sujet
+- date / validité
+- provenance
+
+Types de sources :
+
+- PDF
+- Teams
+- Expert note
+- Procedure
+
+### 5. Explication du score
+
+Afficher pourquoi une carte est recommandée.
+
+Exemple :
+
+Score: 92
+
++ Country match
++ Domain match
++ Topic match
++ Trusted source
++ Business coherence bonus
+
+Les données seront fournies par B2.
+
+### 6. Provenance
+
+Permettre d'afficher :
+
+- nom de la source
+- extrait source
+- URL si disponible
+
+### 7. Affichage des conflits
+
+Afficher visuellement lorsqu'une source est en conflit avec une autre.
+
+Exemple :
+
+⚠ Potential conflict detected
+
+Official Payroll Procedure
+vs
+Teams message
+
+La logique de conflit est fournie par B2.
+
+### 8. Expert recommandé
+
+Afficher l'expert retourné par C.
+
+Exemple :
+
+Recommended Expert
+
+Sophie Lambert
+Belgium Payroll Specialist
+42 solved cases
+
+### 9. Knowledge Map
+
+Ajouter un bouton / onglet :
+
+"Open Knowledge Map"
+
+qui affiche le composant créé par C.
+
+### 10. Polish final
+
+Vérifier :
+
+- responsive laptop
+- écran 16:9
+- cohérence visuelle
+- états hover
+- badges
+- lisibilité des scores
+- lisibilité des conflits
+
+## Interface attendue avec les autres rôles
+
+A doit pouvoir utiliser :
+
+rankKnowledge(cards, context)
+
+getRecommendedExperts(context)
+
+<KnowledgeGraph cards={cards} relations={relations} />
+
+## Definition of Done
+
+- [ ] Les 3 contextes sont sélectionnables
+- [ ] Le contexte actif est visible
+- [ ] Les Knowledge Cards sont affichées
+- [ ] Les scores sont visibles
+- [ ] Les explications des scores sont visibles
+- [ ] La provenance est visible
+- [ ] Un conflit peut être affiché
+- [ ] Un expert peut être affiché
+- [ ] La Knowledge Map est accessible
+- [ ] Aucun chatbot n'est nécessaire
+- [ ] L'interface fonctionne en 16:9
+
+---
+
+# 🟢 RÔLE B1 — DATASET / KNOWLEDGE CARDS / RELATIONS
+**1 personne**
+
+## Objectif
+
+Construire toutes les données utilisées par l'application et déterminer
+comment les Knowledge Cards sont reliées entre elles.
+
+## Tâches
+
+### 1. Types TypeScript
+
+Créer :
+
+src/types/knowledge.ts
+
+Types nécessaires :
+
+KnowledgeCard
+WorkContext
+Relation
+
+Structure principale :
+
+type KnowledgeCard = {
+  id: string
+  title: string
+  summary: string
+
+  sourceType:
+    | "pdf"
+    | "teams"
+    | "expert_note"
+    | "procedure"
+
+  attributes: {
+    country?: string[]
+    domain?: string[]
+    topics?: string[]
+    client?: string[]
+    validFrom?: string
+    owner?: string
+  }
+
+  provenance: {
+    sourceLabel: string
+    sourceUrl?: string
+    extractedAt?: string
+  }
+
+  evidence: {
+    field: string
+    value: string
+    sourceExcerpt: string
+  }[]
+}
+
+type WorkContext = {
+  country: "BE" | "FR"
+  domain: "Payroll" | "Time"
+  topic: string
+  year: number
+  client?: string
+}
+
+### 2. Scénarios
+
+Créer :
+
+src/data/scenarios.ts
+
+Les 3 scénarios :
+
+1. BE / Payroll / Bonus
+2. FR / Payroll / Termination
+3. BE / Time / Overtime
+
+### 3. Dataset
+
+Créer :
+
+src/data/knowledge-cards.ts
+
+Créer environ 30 Knowledge Cards.
+
+Objectif :
+
+- minimum 6 cartes pertinentes par scénario
+- quelques cartes moins pertinentes
+- quelques cartes volontairement hors contexte
+
+Les contenus peuvent être fictifs mais doivent sembler réalistes.
+
+### 4. Types de sources
+
+Les 4 types doivent être représentés :
+
+- PDF
+- Teams
+- Expert note
+- Procedure
+
+### 5. Provenance
+
+Chaque carte importante doit avoir :
+
+- sourceLabel
+- sourceUrl si pertinent
+- evidence
+- sourceExcerpt
+
+### 6. Contradiction
+
+Créer au moins une paire volontairement contradictoire.
+
+Exemple :
+
+Carte A :
+"Official Belgium Bonus Procedure 2026"
+
+Carte B :
+"Teams discussion — old bonus calculation"
+
+Les deux doivent parler du même sujet mais contenir une règle différente.
+
+B2 utilisera cette paire pour la détection de conflit.
+
+### 7. Relations entre Knowledge Cards
+
+Créer :
+
+src/lib/relations.ts
+
+Détecter les attributs partagés :
+
+- même pays
+- même domaine
+- même sujet
+- même client
+- référence explicite
+
+### 8. Poids configurables
+
+Les relations ne doivent PAS utiliser des valeurs métier codées partout
+dans l'algorithme.
+
+Prévoir une configuration du style :
+
+relationConfig = {
+  weights: {
+    country: ...,
+    domain: ...,
+    topic: ...,
+    client: ...,
+    explicitReference: ...
+  },
+
+  bonuses: {
+    countryDomainTopic: ...,
+    clientTopic: ...
+  }
+}
+
+### 9. Bonus de combinaison
+
+Ajouter des bonus lorsque plusieurs signaux cohérents existent.
+
+Exemples :
+
+country + domain + topic
+→ bonus
+
+client + topic
+→ bonus
+
+### 10. API attendue
+
+Créer idéalement :
+
+getRelations(cardA, cardB)
+
+qui retourne quelque chose comme :
+
+{
+  score: 72,
+
+  reasons: [
+    "same country",
+    "same domain",
+    "same topic",
+    "country + domain + topic bonus"
+  ]
+}
+
+## Definition of Done
+
+- [ ] Types TypeScript créés
+- [ ] 3 scénarios créés
+- [ ] ~30 Knowledge Cards disponibles
+- [ ] 4 types de sources représentés
+- [ ] Minimum 6 cartes pertinentes par scénario
+- [ ] Provenance présente
+- [ ] Evidence présente
+- [ ] Une paire contradictoire existe
+- [ ] Relations calculables
+- [ ] Poids configurables
+- [ ] Bonus de combinaison implémentés
+
+---
+
+# 🟠 RÔLE B2 — RANKING / SCORING / CONFLICTS
+**1 personne**
+
+## Objectif
+
+Construire le moteur qui décide quelles connaissances sont les plus
+pertinentes pour le contexte actuel.
+
+Le moteur doit être :
+
+- déterministe
+- configurable
+- explicable
+
+## Tâches
+
+### 1. Configuration du ranking
+
+Créer par exemple :
+
+src/config/ranking.ts
+
+Configuration :
+
+export const rankingConfig = {
+
+  weights: {
+    country: 20,
+    domain: 20,
+    topic: 30,
+    temporalValidity: 10,
+    trustedSource: 10,
+    recency: 5
+  },
+
+  bonuses: {
+    countryDomainTopic: 15,
+    clientTopic: 10
+  },
+
+  penalties: {
+    conflict: 15,
+    uncertainty: 10
+  }
+
+}
+
+IMPORTANT :
+
+Les valeurs doivent pouvoir être modifiées sans changer l'algorithme.
+
+### 2. Ranking
+
+Créer :
+
+src/lib/ranking.ts
+
+Fonction principale :
+
+rankKnowledge(cards, context)
+
+### 3. Calcul du score
+
+Principe :
+
+score =
+  somme(baseWeight × match × confidence)
+  + bonuses
+  - penalties
+
+Prendre en compte :
+
+- Country match
+- Domain match
+- Topic match
+- Temporal validity
+- Trusted source
+- Recency
+- Business coherence
+- Conflict
+- Uncertainty
+
+### 4. Bonus
+
+Ajouter des bonus pour les combinaisons fortes.
+
+Exemple :
+
+country + domain + topic
+→ bonus
+
+client + topic
+→ bonus
+
+### 5. Malus
+
+Prévoir :
+
+- conflit
+- incertitude
+- éventuellement source obsolète
+
+### 6. Explication du score
+
+Ne pas retourner uniquement :
+
+score: 92
+
+Retourner aussi le détail.
+
+Exemple :
+
+{
+  card,
+  score: 92,
+
+  explanation: [
+    {
+      label: "Country match",
+      value: 20
+    },
+    {
+      label: "Domain match",
+      value: 20
+    },
+    {
+      label: "Topic match",
+      value: 30
+    },
+    {
+      label: "Business coherence bonus",
+      value: 15
+    },
+    {
+      label: "Recent source",
+      value: 7
+    }
+  ]
+}
+
+A utilisera directement ces données dans l'interface.
+
+### 7. Tri
+
+Les résultats doivent être triés par score décroissant.
+
+### 8. Conflits
+
+Créer :
+
+src/lib/conflicts.ts
+
+Détecter ou déclarer les Knowledge Cards contradictoires.
+
+Pour le POC, il n'est PAS nécessaire de construire un moteur NLP complexe.
+
+Une contradiction connue dans le dataset suffit si elle est correctement
+modélisée.
+
+### 9. Tester les 3 scénarios
+
+Vérifier :
+
+BE / Payroll / Bonus
+→ cartes Bonus BE en tête
+
+FR / Payroll / Termination
+→ cartes Termination FR en tête
+
+BE / Time / Overtime
+→ cartes Overtime BE en tête
+
+Une source française ne doit pas arriver première dans un contexte belge
+sans justification.
+
+## API attendue
+
+rankKnowledge(cards, context)
+
+detectConflicts(cards)
+
+## Definition of Done
+
+- [ ] Configuration des poids centralisée
+- [ ] Ranking fonctionnel
+- [ ] Country match implémenté
+- [ ] Domain match implémenté
+- [ ] Topic match implémenté
+- [ ] Temporal validity implémentée
+- [ ] Source / owner pris en compte
+- [ ] Bonus implémentés
+- [ ] Malus implémentés
+- [ ] Explication détaillée retournée
+- [ ] Résultats triés
+- [ ] Conflit détectable
+- [ ] Les 3 scénarios donnent des rankings différents
+
+---
+
+# 🟣 RÔLE C — KNOWLEDGE GRAPH / EXPERTS / README / DEMO
+**1 personne**
+
+## Objectif
+
+Construire les fonctionnalités secondaires visibles pendant la démo :
+
+- Knowledge Map
+- recommandation d'expert
+- documentation
+- préparation de la soumission
+
+---
+
+## 1. Experts
+
+Créer :
+
+src/data/experts.ts
+
+Minimum 3 experts.
+
+Structure :
+
+type Expert = {
+  id: string
+  name: string
+  domains: string[]
+  countries: string[]
+  topics: string[]
+  solvedCases: number
+}
+
+Créer idéalement :
+
+- expert Belgium Payroll
+- expert France Payroll
+- expert Belgium Time
+
+---
+
+## 2. Expert Ranking
+
+Créer :
+
+src/lib/expert-ranking.ts
+
+Fonction :
+
+getRecommendedExperts(context)
+
+Comparer :
+
+- country
+- domain
+- topic
+- solvedCases
+
+Retourner le ou les experts les plus adaptés.
+
+Idéalement :
+
+BE / Payroll / Bonus
+→ Expert A
+
+FR / Payroll / Termination
+→ Expert B
+
+BE / Time / Overtime
+→ Expert C
+
+---
+
+## 3. Expert Card
+
+Créer :
+
+src/components/expert-card/
+
+Afficher :
+
+- nom
+- spécialité
+- pays
+- sujets
+- nombre de cas résolus
+
+Le composant sera utilisé par A.
+
+---
+
+## 4. Knowledge Graph
+
+Utiliser :
+
+@xyflow/react
+
+Créer :
+
+src/components/knowledge-graph/
+
+Le graphe est une vue SECONDAIRE.
+
+Il ne doit pas remplacer le Knowledge Compass.
+
+---
+
+## 5. Nodes
+
+Transformer les Knowledge Cards en nodes.
+
+Une Knowledge Card = un node.
+
+Afficher au minimum :
+
+- titre
+- type de source
+
+Différencier visuellement :
+
+- PDF
+- Teams
+- Expert note
+- Procedure
+
+---
+
+## 6. Edges
+
+Utiliser les relations fournies par B1.
+
+Relation entre deux cartes
+→ edge dans React Flow
+
+La force de la relation peut éventuellement modifier :
+
+- épaisseur
+- label
+- opacité
+
+---
+
+## 7. Interactions du graphe
+
+Minimum :
+
+- zoom
+- déplacement
+- drag des nodes
+
+Optionnel :
+
+- clic sur un node
+- affichage des détails
+- filtrage
+
+Ne pas perdre trop de temps dessus.
+
+---
+
+## 8. API / composant attendu
+
+A doit pouvoir faire :
+
+<KnowledgeGraph
+  cards={cards}
+  relations={relations}
+/>
+
+---
+
+## 9. README
+
+Préparer README.md.
+
+Sections :
+
+# Knowledge Compass
+
+## Problem
+
+## Solution
+
+## Architecture
+
+## Features
+
+## Tech Stack
+
+## How to run
+
+## Demo scenarios
+
+## Limitations
+
+## Team
+
+Commande minimum :
+
+npm install
+npm run dev
+
+---
+
+## 10. Script de démo
+
+Préparer une démo de 60–90 secondes.
+
+Ordre recommandé :
+
+1. Ouvrir Belgium / Payroll / Bonus
+2. Montrer qu'aucune recherche n'est nécessaire
+3. Montrer les connaissances automatiquement recommandées
+4. Ouvrir une Knowledge Card
+5. Montrer le score et son explication
+6. Montrer la provenance
+7. Montrer le conflit Procedure vs Teams
+8. Montrer l'expert recommandé
+9. Passer sur France / Payroll / Termination
+10. Montrer que tout le ranking change
+11. Ouvrir la Knowledge Map
+12. Montrer les relations entre les connaissances
+
+Pitch :
+
+"We turn fragmented organizational knowledge into a connected
+knowledge layer, then project the right part of that knowledge
+into the employee's current context."
+
+---
+
+## 11. Soumission
+
+Préparer avec l'équipe :
+
+- README
+- description Builderbase
+- GitHub public
+- vidéo < 3 minutes
+- screenshots Aikido avant/après
+
+## Definition of Done
+
+- [ ] Minimum 3 experts
+- [ ] Expert ranking fonctionnel
+- [ ] Expert Card disponible
+- [ ] Knowledge Graph fonctionnel
+- [ ] Knowledge Cards transformées en nodes
+- [ ] Relations transformées en edges
+- [ ] Zoom / déplacement fonctionnels
+- [ ] README prêt
+- [ ] Script de démo prêt
+- [ ] Éléments de soumission préparés
+
+---
+
+# 🔗 CONTRATS ENTRE LES 4 RÔLES
+
+Pour éviter les blocages, on se met d'accord sur ces interfaces.
+
+## B1 fournit
+
+knowledgeCards
+scenarios
+getRelations(cardA, cardB)
+
+## B2 fournit
+
+rankKnowledge(cards, context)
+detectConflicts(cards)
+
+## C fournit
+
+experts
+getRecommendedExperts(context)
+<KnowledgeGraph />
+
+## A consomme
+
+scenarios
+knowledgeCards
+rankKnowledge()
+detectConflicts()
+getRecommendedExperts()
+<KnowledgeGraph />
+
+---
+
+# 🌿 BRANCHES GIT CONSEILLÉES
+
+A :
+
+feature/ui-compass
+
+B1 :
+
+feature/knowledge-data
+
+B2 :
+
+feature/ranking-engine
+
+C :
+
+feature/graph-experts
+
+Éviter de travailler directement sur `main`.
+
+---
+
+# ⚠️ ORDRE D'INTÉGRATION
+
+1. B1 → types + scenarios + dataset
+2. B2 → ranking + conflicts
+3. C → experts + graph
+4. A → intégration finale
+5. Toute l'équipe → tests
+6. Toute l'équipe → Aikido
+7. C + équipe → README / vidéo / soumission
+
+---
+
+# ✅ CHECKLIST MVP ÉQUIPE
+
+Avant de considérer le projet terminé :
+
+- [ ] `npm run dev` fonctionne
+- [ ] 3 contextes métier disponibles
+- [ ] Le changement de contexte change les recommandations
+- [ ] Chaque Knowledge Card possède un score
+- [ ] Chaque score possède une explication
+- [ ] La provenance est visible
+- [ ] Au moins un conflit est affiché
+- [ ] Au moins un expert est recommandé
+- [ ] La Knowledge Map fonctionne
+- [ ] Les 4 types de sources sont visibles
+- [ ] Aucun chatbot n'est nécessaire
+- [ ] Démo complète possible en moins de 3 minutes
+- [ ] README terminé
+- [ ] Repo GitHub public
+- [ ] Audit Aikido effectué
+- [ ] Screenshots Aikido avant/après
+- [ ] Vidéo < 3 minutes
+- [ ] Description Builderbase prête
