@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/quartz/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -19,10 +20,14 @@ raw.pdf
 
 # production
 /build
+/quartz/public
+/quartz/.quartz-cache
 
 # misc
 .DS_Store
 *.pem
+message.txt
+message.txt:Zone.Identifier
 
 # debug
 npm-debug.log*
@@ -32,6 +37,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel

@@ -6,10 +6,14 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "quartz:setup": "bash scripts/quartz-setup.sh",
+    "quartz:dev": "npm --prefix quartz run quartz -- build --serve",
+    "adc:check": "bash scripts/check-adc.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
+    "@google/genai": "^2.24.0",
     "@xyflow/react": "^12.12.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
