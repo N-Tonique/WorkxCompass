@@ -203,6 +203,8 @@ plugins:
     enabled: true
     options:
       links:
+        ← Page principale: http://localhost:3000
+        Browse Markdown: http://localhost:3000/notes
         Ingest UI: http://localhost:3000/ingest
         GitHub: https://github.com/N-Tonique/sdworkx
     layout:

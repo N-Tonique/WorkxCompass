@@ -8,6 +8,8 @@ tags:
 
 # Knowledge Compass
 
+> **[← Retour à la page principale](http://localhost:3000)** · [Browse Markdown](http://localhost:3000/notes) · [Ingest](http://localhost:3000/ingest)
+
 Jardin de connaissances de démonstration pour le challenge SD Worx (FIND).
 
 ## Scénarios
@@ -16,7 +18,9 @@ Jardin de connaissances de démonstration pour le challenge SD Worx (FIND).
 - France / Payroll / Termination
 - Belgium / Time / Overtime
 
-## Cartes (42)
+## Cartes
+
+Voir la liste complète ci-dessous ; chaque note est reliée via des `[[wikilinks]]`.
 
 - [[Belgium Bonus Procedure 2026]]
 - [[Teams Bonus Calculation Draft]]
